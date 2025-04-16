@@ -1,0 +1,59 @@
+# PyCharm specific files
+.idea/
+*.iml
+
+# Python bytecode files
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# VSCode settings
+.vscode/
+
+# MacOS specific
+.DS_Store
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+
+# Logs
+*.log
+
+# Pytest cache
+.cache/
+.pytest_cache/
+
+# Other common IDEs and editors (e.g., Sublime Text, Atom)
+*.sublime-workspace
+*.sublime-project
+*.atom
+
+# Coverage reports
+.coverage
+*.coveragerc
+*.hypothesis/
+
+# Python environment-related files
+pip-log.txt
+pip-delete-this-directory.txt
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
