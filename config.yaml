@@ -1,0 +1,200 @@
+hub:
+  config:
+    JupyterHub:
+      authenticator_class: generic-oauth
+      admin_access: true
+      base_url: /
+      log_level: 10
+
+    Authenticator:
+      enable_auth_state: true
+      allow_all: True
+
+    GenericOAuthenticator:
+      client_id: "zebrid-client"
+      client_secret: "zebrid-secret"
+      oauth_callback_url: "https://notebook.zebrid.com/hub/oauth_callback"
+      authorize_url: "https://www.zebrid.com/v1/api/oauth/code"
+      token_url: "https://www.zebrid.com/v1/api/oauth/token"
+      userdata_url: "https://www.zebrid.com/v1/api/oauth/user"
+      username_key: "name"
+      username_claim: name
+      scope: []
+      login_service: zebrid
+      auto_login: true
+      refresh_pre_spawn: true
+    
+  extraConfig:
+    00-config: |
+      c.Spawner.default_url = "/lab"
+      c.Authenticator.allowed_users = set()
+
+      async def pre_spawn_hook(spawner):
+          import requests
+          import os
+          gcs_bucket = "zebrid-prod"
+
+          userinfo = spawner.user.name.split("-")
+          username = None
+          notebook_id = None
+          if len(userinfo) == 1:
+              username = userinfo[0]
+              notebook_id = 16
+          elif len(userinfo) == 2:
+              username, notebook_id = userinfo
+
+          print("username: ", username)
+          print("notebook_id: ", notebook_id)
+
+          token = await spawner.user.get_auth_state()  # 拿到平台 token
+          print("token: ", token)
+
+          headers = {
+              "Authorization": f"Bearer {token.get('access_token')}"
+          }
+
+        #   resp = requests.get(
+        #       f"/v1/api/notebook/ref/{username.split('-')[-1]}",
+        #       headers=headers,
+        #       timeout=5
+        #   )
+          resp = None
+
+          mock_resp = {
+              "resMsg": "Success",
+              "resCode": "0",
+              "data": {
+                  "userId": 1,
+                  "dataset": [
+                      {
+                          "id": 9,
+                          "notebookId": 16,
+                          "type": 1,
+                          "refId": 1,
+                          "name": "iapp 极光",
+                          "path": None
+                      }
+                  ],
+                  "model": [
+                      {
+                          "id": 10,
+                          "notebookId": 16,
+                          "type": 2,
+                          "refId": 1,
+                          "name": "DeepSeek R1",
+                          "path": None
+                      }
+                  ],
+                  "project": []
+              }
+          }
+
+
+          if True or resp.status_code == 200:
+              # response = resp.json()
+              response = mock_resp
+              data = response.get("data")
+              user_id = data.get("userId")
+
+              paths = []
+              for d in data.get("dataset"):
+                  paths.append(f"gs://{gcs_bucket}/dataset/{user_id}/{d.get("refId")}")
+              for m in data.get("model"):
+                  paths.append(f"gs://{gcs_bucket}/model/{user_id}/{m.get("refId")}")
+              for p in data.get("project"):
+                  paths.append(f"gs://{gcs_bucket}/project/{user_id}/{p.get("refId")}")
+                  # gcs_path = resp.json().get("gcsPath")
+              gcs_path = ','.join(paths)
+          else:
+              gcs_path = ""
+          # 先mock gcs_path
+          # gcs_path = "gs://zebrid-prod/dataset/1/1/house_sales.csv"
+          spawner.environment["GCS_PATH"] = gcs_path
+          print(spawner.environment["GCS_PATH"])
+
+          # 获取 PVC 名称，JupyterHub 会为每个用户自动创建一个 PVC
+          pvc_name = spawner.pvc_name  # 使用 JupyterHub 自动生成的 PVC 名称
+          print("pvc_name: ", pvc_name)
+
+          # 保留原有的 initContainer 配置并追加新的容器
+          if not spawner.init_containers:
+              spawner.init_containers = []
+
+          spawner.init_containers.append({
+              "name": "gcs-fetcher",
+              "image": "us-central1-docker.pkg.dev/web-application-24120001/custom-dockerhub/gsutil-tool",
+              # "command": ["sh", "-c", "echo Main container started; sleep 36000"],
+              # "command": ["/bin/bash", "/scripts/gcs-fetch.sh"],
+              "command": ["/bin/bash", "-c", "gcloud auth activate-service-account --key-file=/secrets/key.json && bash /scripts/gcs-fetch.sh"],
+              "env": [
+                  {"name": "GCS_PATH", "value": gcs_path},
+                  {"name": "GOOGLE_APPLICATION_CREDENTIALS", "value": "/secrets/key.json"}
+              ],
+              "volumeMounts": [
+                  {
+                      "name": pvc_name,
+                      "mountPath": "/home/jovyan/work"
+                  },
+                  {
+                  "name": "gcs-service-account",
+                  "mountPath": "/secrets",
+                  "readOnly": True
+                  }
+              ]
+          })
+          # spawner.extra_pod_annotations = {
+          #   "iam.gke.io/gcp-service-account": "gsutil-service-account@web-application-24120001.iam.gserviceaccount.com"
+          # }
+
+          # 配置 volumes，确保 PVC 正确挂载
+          spawner.volumes = [
+              {
+                  "name": pvc_name,  # 使用 JupyterHub 自动生成的 PVC 名称
+                  "persistentVolumeClaim": {
+                      "claimName": pvc_name
+                  }
+              },
+              {
+                  "name": "gcs-service-account",
+                  "secret": {
+                  "secretName": "gcs-service-account"
+                  }
+              }
+          ]
+
+          # 配置 ServiceAccount
+          # spawner.service_account = "gsutil-service-account"
+
+          # 配置主容器挂载该卷
+          spawner.volume_mounts = [
+              {
+                  "name": pvc_name,
+                  "mountPath": "/home/jovyan"
+              }
+          ]
+
+      c.Spawner.pre_spawn_hook = pre_spawn_hook
+      c.Spawner.start_timeout = 3600  # 设置一个小时超时时间
+
+singleuser:
+  # 使用 dynamic配置 storage
+  storage:
+    type: dynamic
+    dynamic:
+      storageClass: standard-rwo
+    capacity: 10Gi
+
+proxy:
+  secretToken: "c5c1917d09c79684b1ae8351ae29c4d460e4e7d6e028c1111fbe6c542f17b16b"
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - notebook.zebrid.com
+  tls:
+    - hosts:
+        - notebook.zebrid.com
+      secretName: notebook-zebrid-com-tls

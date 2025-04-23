@@ -1,0 +1,7 @@
+FROM google/cloud-sdk:slim
+
+RUN mkdir -p /scripts
+COPY gcs-fetch.sh /scripts/gcs-fetch.sh
+RUN chmod +x /scripts/gcs-fetch.sh
+
+ENTRYPOINT ["/scripts/gcs-fetch.sh"]
