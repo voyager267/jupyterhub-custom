@@ -53,58 +53,63 @@ hub:
               "Authorization": f"Bearer {token.get('access_token')}"
           }
 
-        #   resp = requests.get(
-        #       f"/v1/api/notebook/ref/{username.split('-')[-1]}",
-        #       headers=headers,
-        #       timeout=5
-        #   )
-          resp = None
+          url = f"https://www.zebrid.com/v1/api/notebook/ref/{notebook_id}"
+          print(f"request url: {url}")
 
-          mock_resp = {
-              "resMsg": "Success",
-              "resCode": "0",
-              "data": {
-                  "userId": 1,
-                  "dataset": [
-                      {
-                          "id": 9,
-                          "notebookId": 16,
-                          "type": 1,
-                          "refId": 1,
-                          "name": "iapp 极光",
-                          "path": None
-                      }
-                  ],
-                  "model": [
-                      {
-                          "id": 10,
-                          "notebookId": 16,
-                          "type": 2,
-                          "refId": 1,
-                          "name": "DeepSeek R1",
-                          "path": None
-                      }
-                  ],
-                  "project": []
-              }
-          }
+          resp = requests.get(
+              url,
+              headers=headers,
+              timeout=5
+          )
+        #   resp = None
+
+        #   mock_resp = {
+        #       "resMsg": "Success",
+        #       "resCode": "0",
+        #       "data": {
+        #           "userId": 1,
+        #           "dataset": [
+        #               {
+        #                   "id": 9,
+        #                   "notebookId": 16,
+        #                   "type": 1,
+        #                   "refId": 1,
+        #                   "name": "iapp 极光",
+        #                   "path": None
+        #               }
+        #           ],
+        #           "model": [
+        #               {
+        #                   "id": 10,
+        #                   "notebookId": 16,
+        #                   "type": 2,
+        #                   "refId": 1,
+        #                   "name": "DeepSeek R1",
+        #                   "path": None
+        #               }
+        #           ],
+        #           "project": []
+        #       }
+        #   }
 
 
           if True or resp.status_code == 200:
-              # response = resp.json()
-              response = mock_resp
+              response = resp.json()
+              print(f"response: {response}")
+            #   response = mock_resp
               data = response.get("data")
               user_id = data.get("userId")
 
               paths = []
               for d in data.get("dataset"):
-                  paths.append(f"gs://{gcs_bucket}/dataset/{user_id}/{d.get("refId")}")
+                  paths.append(f"gs://{gcs_bucket}/dataset/{user_id}/{d.get('refId')}")
               for m in data.get("model"):
-                  paths.append(f"gs://{gcs_bucket}/model/{user_id}/{m.get("refId")}")
+                  paths.append(f"gs://{gcs_bucket}/model/{user_id}/{m.get('refId')}")
               for p in data.get("project"):
-                  paths.append(f"gs://{gcs_bucket}/project/{user_id}/{p.get("refId")}")
+                  paths.append(f"gs://{gcs_bucket}/project/{user_id}/{p.get('refId')}")
                   # gcs_path = resp.json().get("gcsPath")
               gcs_path = ','.join(paths)
+              print(f"gcs_path: {gcs_path}")
           else:
               gcs_path = ""
           # 先mock gcs_path
