@@ -102,11 +102,11 @@ hub:
 
               paths = []
               for d in data.get("dataset"):
-                  paths.append(f"gs://{gcs_bucket}/dataset/{user_id}/{d.get('refId')}")
+                  paths.append(f"gs://{gcs_bucket}/{d.get('path')}")
               for m in data.get("model"):
-                  paths.append(f"gs://{gcs_bucket}/model/{user_id}/{m.get('refId')}")
+                  paths.append(f"gs://{gcs_bucket}/{m.get('path')}")
               for p in data.get("project"):
-                  paths.append(f"gs://{gcs_bucket}/project/{user_id}/{p.get('refId')}")
+                  paths.append(f"gs://{gcs_bucket}/{p.get('path')}")
                   # gcs_path = resp.json().get("gcsPath")
               gcs_path = ','.join(paths)
               print(f"gcs_path: {gcs_path}")
